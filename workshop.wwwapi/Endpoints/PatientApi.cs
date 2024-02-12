@@ -1,12 +1,8 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using workshop.wwwapi.Repository.AppointmentRepository;
+using workshop.wwwapi.Repository;
 using workshop.wwwapi.Models;
 
-using static System.Reflection.Metadata.BlobBuilder;
-using workshop.wwwapi.Repository;
-using workshop.wwwapi.Models.PatientDto;
-using workshop.wwwapi.Repository.PatientRepository;
-using workshop.wwwapi.Repository.DoctorRepository;
+using workshop.wwwapi.DTO;
 
 namespace workshop.wwwapi.Endpoints
 {
@@ -17,68 +13,64 @@ namespace workshop.wwwapi.Endpoints
         {
             var patientGroup = app.MapGroup("patient");
 
-            patientGroup.MapGet("/", GetPatients);
-            patientGroup.MapGet("/{id}", GetPatientById);
-            patientGroup.MapGet("/appointments{id}", GetPatientAppointmentsById);
-            //patientGroup.MapGet("/appointment{id}", GetDoctorsAppointmentsById);
+            patientGroup.MapGet("/", GetAllPatients);
+            patientGroup.MapPost("/", CreatePatient);
+            patientGroup.MapGet("/appointments", GetPatientsAppointments);
+
         }
 
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
         [ProducesResponseType(StatusCodes.Status200OK)]
-        public static async Task<IResult> GetPatients([FromServices] IPatientRepository repository)
+
+        public static async Task<IResult> GetAllPatients([FromServices] IRepository repository)
         {
             var patients = await repository.GetAllPatients();
-            var results = patients.Select(p => new DoctorDto
+            if (patients == null)
             {
-                Id = p.Id,
-                FullName = p.FullName,
-                //appointments = null
+                return TypedResults.NotFound("No patients found");
+            }
+            var results = patients.OrderBy(a => a.Id).Select(a => new PatientDto(a)).ToList();
 
-            }).ToList();
+
             return TypedResults.Ok(results);
         }
 
 
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        public static async Task<IResult> GetPatientById([FromServices] IPatientRepository repository, int id)
+
+        [ProducesResponseType(StatusCodes.Status201Created)]
+        [ProducesResponseType(StatusCodes.Status400BadRequest)]
+        public static async Task<IResult> CreatePatient(IRepository repository, string FullName)
         {
-            var patient = await repository.GetPatientById(id);
-            var results = patient.Select(p => new PatientDto
+            var newPatient = await repository.CreatePatient(FullName);
+            if (newPatient == null)
             {
-                Id = p.Id,
-                FullName = p.FullName,
-                //appointments = null
-
-            }).ToList();
-            return TypedResults.Ok(results);
-        }
-
-
-        [ProducesResponseType(StatusCodes.Status200OK)]
-        public static async Task<IResult> GetPatientAppointmentsById([FromServices] IPatientRepository repository, int id)
-        {
-            var patient = (await repository.GetPatientsAppointmentById(id)).FirstOrDefault();
-            if (patient == null)
-            {
-                return TypedResults.NotFound("Patient not found");
+                return TypedResults.BadRequest("Failed to create a patient, check if uniquness of Id ");
             }
 
-            var patientDto = new PatientDto()
-            {
-                Id = patient.Id,
-                FullName = patient.FullName,
-                appointments = patient.Appointments != null ? patient.Appointments.Select(a => new AppointmentDto()
-                {
-                    Id = a.Id,
-                    Booking = a.Booking,
-                    doctor = a.Doctor != null ? new DoctorDto()
-                    {
-                        Id = a.Doctor.Id,
-                        FullName = a.Doctor.FullName
-                    } : null
-                }).ToList() : null
-            };
+            PatientDto patientDto = new PatientDto(newPatient);
 
-            return TypedResults.Ok(patientDto);
+            return TypedResults.Created($"Patient with id: {newPatient.Id} is created", patientDto);
+
         }
+
+
+        [ProducesResponseType(StatusCodes.Status200OK)]
+        [ProducesResponseType(StatusCodes.Status404NotFound)]
+        public static async Task<IResult> GetPatientsAppointments(IRepository repository)
+        {
+            var patients = await repository.GetPatientsAppointments();
+
+            if (patients == null)
+            {
+                return Results.NotFound("No Appointments for the patients found");
+            }
+
+            var result = patients.OrderBy(a => a.Id).Select(a => new PatientDto(a)).ToList();
+
+            return TypedResults.Ok(result);
+        }
+
+
+
     }
 }

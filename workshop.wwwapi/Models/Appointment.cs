@@ -1,5 +1,8 @@
-﻿using Microsoft.EntityFrameworkCore;
+﻿using System;
+using Microsoft.EntityFrameworkCore;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace workshop.wwwapi.Models
 {
@@ -19,7 +22,13 @@ namespace workshop.wwwapi.Models
         [Column("patient_id")]
         public int PatientId { get; set; }
 
+        //[JsonIgnore]
+        [ForeignKey("DoctorId")]
         public Doctor Doctor { get; set; }
+
+
+        //[JsonIgnore]
+        [ForeignKey("PatientId")]
         public Patient Patient { get; set; }
 
     }
